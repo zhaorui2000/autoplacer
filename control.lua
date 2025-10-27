@@ -77,6 +77,72 @@ script.on_event(SHORTCUT, function(event)
     toggle_shortcut(game.get_player(event.player_index))
 end)
 
+-- Handle console commands
+commands.add_command("autoplacer-research", {"autoplacer.command.description"}, function(command)
+    local player = game.get_player(command.player_index)
+    if not player then
+        -- If command is run from server console, apply to all forces
+        for _, force in pairs(game.forces) do
+            if force.technologies["autoplacer"] and not force.technologies["autoplacer"].researched then
+                force.technologies["autoplacer"].researched = true
+                game.print({"autoplacer.command.researched-server", force.name})
+            end
+        end
+        return
+    end
+    
+    -- Check if player has admin privileges (optional, you can remove this check if you want all players to use it)
+    if not player.admin then
+        player.print({"autoplacer.command.no-permission"})
+        return
+    end
+    
+    -- Check if technology is already researched
+    if player.force.technologies["autoplacer"].researched then
+        player.print({"autoplacer.command.already-researched"})
+        return
+    end
+    
+    -- Research the technology
+    player.force.technologies["autoplacer"].researched = true
+    player.print({"autoplacer.command.researched"})
+end)
+
+-- Handle console commands for range technologies
+commands.add_command("autoplacer-range", {"autoplacer.command.range-description"}, function(command)
+    local player = game.get_player(command.player_index)
+    if not player then
+        -- If command is run from server console, apply to all forces
+        for _, force in pairs(game.forces) do
+            for i = 1, 3 do
+                local tech_name = "autoplacer-range-" .. i
+                if force.technologies[tech_name] and not force.technologies[tech_name].researched then
+                    force.technologies[tech_name].researched = true
+                    game.print({"autoplacer.command.range-researched-server", tech_name, force.name})
+                end
+            end
+        end
+        return
+    end
+    
+    -- Check if player has admin privileges
+    if not player.admin then
+        player.print({"autoplacer.command.no-permission"})
+        return
+    end
+    
+    -- Research all range technologies
+    for i = 1, 3 do
+        local tech_name = "autoplacer-range-" .. i
+        if not player.force.technologies[tech_name].researched then
+            player.force.technologies[tech_name].researched = true
+            player.print({"autoplacer.command.range-researched", tech_name})
+        else
+            player.print({"autoplacer.command.range-already-researched", tech_name})
+        end
+    end
+end)
+
 -- Listen for two key events to implement the auto-placement feature:
 --   1. When the selected entity changes (including dragging the cursor over ghosts)
 --   2. When the cursor item changes (such as switching hotbar items or using the pipette tool)
