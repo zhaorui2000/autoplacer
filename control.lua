@@ -1,151 +1,181 @@
 -- control.lua
--- AutoPlacer module main file, implements the function of automatically placing entity ghosts
+-- 自动放置器模块主文件，实现自动放置实体幽灵的功能
 
--- Define the name of the shortcut key
+-- 快捷键名称定义
 local SHORTCUT = 'autoplacer-toggle'
 
--- Check if the player has researched the relevant technology to enable this function
--- Only players who have researched the "autoplacer" technology can use this function
+-- 检查玩家是否已研究相关技术以启用此功能
+-- 只有研究"autoplacer"技术的玩家才能使用此功能
 local function is_available(player)
     return player.force.technologies["autoplacer"].researched
 end
 
--- Set the toggle state of the shortcut key (on/off)
+-- 设置快捷键的切换状态（开/关）
 local function set_toggled(player, state)
     player.set_shortcut_toggled(SHORTCUT, state)
 end
 
--- Check if the shortcut is currently in the on state
+-- 检查快捷键当前是否处于开启状态
 local function is_toggled(player)
     return player.is_shortcut_toggled(SHORTCUT)
 end
 
--- Check if the distance between the player and the target position is within the build range
-local function is_within_build_range(player, target_position)
-    local player_position = player.position
-    local build_distance = player.build_distance
-    
-    -- Check for the new range technologies and calculate build distance
+-- 计算玩家的最大建造距离
+local function get_build_distance(player)
+    local distance = player.build_distance
+
+    -- 检查新范围技术并计算建造距离
     if player.force.technologies["autoplacer-range-1"].researched then
-        build_distance = build_distance * 2  -- Double the range
+        distance = distance * 2 -- 距离翻倍
     end
-    
+
     if player.force.technologies["autoplacer-range-2"].researched then
-        build_distance = build_distance * 2  -- Double the range again (4x total)
+        distance = distance * 2 -- 再次翻倍（总计4倍）
     end
 
     if player.force.technologies["autoplacer-range-3"].researched then
         local range_upgrade_level = player.force.technologies["autoplacer-range-3"].level - 2
         if range_upgrade_level >= 1 then
-            build_distance = build_distance * (2 ^ range_upgrade_level)
+            distance = distance * (2 ^ range_upgrade_level)
         end
     end
-    
-    local distance = math.sqrt((target_position.x - player_position.x)^2 + (target_position.y - player_position.y)^2)
+
+    return distance
+end
+
+-- 检查玩家与目标位置的距离是否在建造范围内
+local function is_within_build_range(player, target_position)
+    local player_position = player.position
+    local build_distance = get_build_distance(player)
+    local distance = math.sqrt((target_position.x - player_position.x) ^ 2 + (target_position.y - player_position.y) ^ 2)
     return distance <= build_distance
 end
 
--- Core function to toggle shortcut state for the player
+-- 核心功能：切换玩家的快捷键状态
 local function toggle_shortcut(player)
     if not player then return end
 
-    -- If the technology is not researched, forcibly disable the shortcut and return
+    -- 如果技术未研究，强制禁用快捷键并返回
     if not is_available(player) then
         set_toggled(player, false)
         return
     end
 
-    -- Toggle state and show prompt message to the player
+    -- 切换状态并向玩家显示提示消息
     if is_toggled(player) then
-        player.print({"autoplacer.messages.disabled"})
+        player.print({ "autoplacer.messages.disabled" })
         set_toggled(player, false)
     else
-        player.print({"autoplacer.messages.enabled"})
+        player.print({ "autoplacer.messages.enabled" })
         set_toggled(player, true)
     end
 end
 
--- Handle Lua shortcut events (triggered when the player presses the defined shortcut key)
+-- 处理Lua快捷键事件（当玩家按下定义的快捷键时触发）
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == SHORTCUT then
         toggle_shortcut(game.get_player(event.player_index))
     end
 end)
 
--- Handle custom key input events (another trigger method)
+-- 处理自定义按键输入事件（另一种触发方式）
 script.on_event(SHORTCUT, function(event)
     toggle_shortcut(game.get_player(event.player_index))
 end)
 
--- Handle console commands
-commands.add_command("autoplacer-research", {"autoplacer.command.description"}, function(command)
+-- 为所有势力研究自动放置器技术
+local function research_for_all_forces(technology_name)
+    for _, force in pairs(game.forces) do
+        if force.technologies[technology_name] and not force.technologies[technology_name].researched then
+            force.technologies[technology_name].researched = true
+            game.print({ "autoplacer.command.researched-server", force.name })
+        end
+    end
+end
+
+-- 处理控制台命令：研究自动放置器技术
+commands.add_command("autoplacer-research", { "autoplacer.command.description" }, function(command)
     local player = game.get_player(command.player_index)
     if not player then
-        -- If command is run from server console, apply to all forces
-        for _, force in pairs(game.forces) do
-            if force.technologies["autoplacer"] and not force.technologies["autoplacer"].researched then
-                force.technologies["autoplacer"].researched = true
-                game.print({"autoplacer.command.researched-server", force.name})
-            end
-        end
+        -- 如果从服务器控制台运行命令，应用于所有势力
+        research_for_all_forces("autoplacer")
         return
     end
-    
-    -- Check if player has admin privileges (optional, you can remove this check if you want all players to use it)
+
+    -- 检查玩家是否有管理员权限（可选，您可以根据需要移除此检查）
     if not player.admin then
-        player.print({"autoplacer.command.no-permission"})
+        player.print({ "autoplacer.command.no-permission" })
         return
     end
-    
-    -- Check if technology is already researched
+
+    -- 检查技术是否已经研究
     if player.force.technologies["autoplacer"].researched then
-        player.print({"autoplacer.command.already-researched"})
+        player.print({ "autoplacer.command.already-researched" })
         return
     end
-    
-    -- Research the technology
+
+    -- 研究技术
     player.force.technologies["autoplacer"].researched = true
-    player.print({"autoplacer.command.researched"})
+    player.print({ "autoplacer.command.researched" })
 end)
 
--- Handle console commands for range technologies
-commands.add_command("autoplacer-range", {"autoplacer.command.range-description"}, function(command)
+-- 处理控制台命令：研究范围技术
+commands.add_command("autoplacer-range", { "autoplacer.command.range-description" }, function(command)
     local player = game.get_player(command.player_index)
     if not player then
-        -- If command is run from server console, apply to all forces
-        for _, force in pairs(game.forces) do
-            for i = 1, 3 do
-                local tech_name = "autoplacer-range-" .. i
-                if force.technologies[tech_name] and not force.technologies[tech_name].researched then
-                    force.technologies[tech_name].researched = true
-                    game.print({"autoplacer.command.range-researched-server", tech_name, force.name})
-                end
-            end
+        -- 如果从服务器控制台运行命令，应用于所有势力
+        for i = 1, 3 do
+            research_for_all_forces("autoplacer-range-" .. i)
         end
         return
     end
-    
-    -- Check if player has admin privileges
+
+    -- 检查玩家是否有管理员权限
     if not player.admin then
-        player.print({"autoplacer.command.no-permission"})
+        player.print({ "autoplacer.command.no-permission" })
         return
     end
-    
-    -- Research all range technologies
+
+    -- 研究所有范围技术
     for i = 1, 3 do
         local tech_name = "autoplacer-range-" .. i
         if not player.force.technologies[tech_name].researched then
             player.force.technologies[tech_name].researched = true
-            player.print({"autoplacer.command.range-researched", tech_name})
+            player.print({ "autoplacer.command.range-researched", tech_name })
         else
-            player.print({"autoplacer.command.range-already-researched", tech_name})
+            player.print({ "autoplacer.command.range-already-researched", tech_name })
         end
     end
 end)
 
--- Listen for two key events to implement the auto-placement feature:
---   1. When the selected entity changes (including dragging the cursor over ghosts)
---   2. When the cursor item changes (such as switching hotbar items or using the pipette tool)
+-- 显示范围提示信息
+local function show_range_message(player, position, message_key)
+    player.create_local_flying_text({
+        text = { message_key },
+        position = position,
+        color = { r = 1, g = 0.4, b = 0.4 },
+        time_to_live = 600
+    })
+end
+
+-- 显示建造失败提示信息
+local function show_build_failed_message(player, position)
+    player.create_local_flying_text({
+        text = { "autoplacer.messages.build-failed" },
+        position = position,
+        color = { r = 1, g = 0.4, b = 0.4 },
+    })
+end
+
+-- 处理物品归还
+local function refund_item(player, item_name, quality, position)
+    player.insert({ name = item_name, count = 1, quality = quality })
+    show_build_failed_message(player, position)
+end
+
+-- 监听两个关键事件以实现自动放置功能：
+--   1. 当所选实体改变时（包括将光标拖拽到幽灵上）
+--   2. 当光标物品改变时（如切换快捷栏物品或使用吸管工具）
 script.on_event({
     defines.events.on_selected_entity_changed,
     defines.events.on_player_cursor_stack_changed
@@ -153,25 +183,25 @@ script.on_event({
     local player = game.get_player(event.player_index)
     if not player then return end
 
-    -- Ensure the auto-placement feature is enabled
+    -- 确保自动放置功能已启用
     if not is_toggled(player) then return end
 
-    -- Check if the player is hovering over an entity ghost
-    -- Entity ghosts are placeholders in Factorio that represent entities to be placed
+    -- 检查玩家是否悬停在实体幽灵上
+    -- 实体幽灵是Factorio中代表要放置实体的占位符
     local hovered_entity = player.selected
     if hovered_entity and hovered_entity.name == "entity-ghost" then
-        -- Get the prototype information of the ghost entity
+        -- 获取幽灵实体的原型信息
         local ghost_prototype = hovered_entity.ghost_prototype
         if not ghost_prototype then return end
 
-        -- Get the list of items that can place this ghost
+        -- 获取可以放置此幽灵的物品列表
         local item_list = ghost_prototype.items_to_place_this
         local cursor_stack = player.cursor_stack
 
-        -- Check if there is an item in the cursor
+        -- 检查光标中是否有物品
         local has_cursor_item = cursor_stack and cursor_stack.valid_for_read
 
-        -- Check if the item in the cursor can be used to build the currently hovered ghost
+        -- 检查光标中的物品是否可用于建造当前悬停的幽灵
         local matching_item = nil
         if has_cursor_item then
             for _, item in pairs(item_list) do
@@ -182,47 +212,39 @@ script.on_event({
             end
         end
 
-        -- Only check the build range if the item in the cursor can place the current ghost
+        -- 只有当光标中的物品可以放置当前幽灵时才检查建造范围
         if matching_item then
-            -- Check if the target position is within the player's build range
+            -- 检查目标位置是否在玩家的建造范围内
             if not is_within_build_range(player, hovered_entity.position) then
-                -- Out of build range, show prompt message
-                player.create_local_flying_text({
-                    text = {"autoplacer.messages.out-of-range"},
-                    position = hovered_entity.position,
-                    color = {r = 1, g = 0.4, b = 0.4},
-                    time_to_live = 600
-                })
+                -- 超出建造范围，显示提示信息
+                show_range_message(player, hovered_entity.position, { "autoplacer.messages.out-of-range" })
                 return
             end
         end
 
-        -- Check if an entity can be placed at that position, preventing construction on colliding entities or terrain
-        -- Using the surface version of the function avoids issues with replacement entities (such as placing a belt on an underground belt)
+        -- 检查是否可以在该位置放置实体，防止在碰撞实体或地形上建造
+        -- 使用表面版本的函数可以避免替换实体的问题（如在地下传送带上放置传送带）
         if not player.surface.can_place_entity({
-            name = hovered_entity.ghost_name,
-            position = hovered_entity.position,
-            direction = hovered_entity.direction,
-            force = player.force,
-            build_check_type = defines.build_check_type.ghost_revive,
-        }) then return end
+                name = hovered_entity.ghost_name,
+                position = hovered_entity.position,
+                direction = hovered_entity.direction,
+                force = player.force,
+                build_check_type = defines.build_check_type.ghost_revive,
+            }) then
+            return
+        end
 
-        -- If a matching item is found, perform the build operation
+        -- 如果找到匹配的物品，执行建造操作
         if matching_item then
-            -- Reduce the quantity of items in the cursor (consume one item)
+            -- 减少光标中物品的数量（消耗一个物品）
             cursor_stack.count = cursor_stack.count - 1
 
-            -- Try to "revive" the ghost entity into a real entity
-            -- This is the key method for converting ghosts in blueprints to real entities
+            -- 尝试"复活"幽灵实体为真实实体
+            -- 这是将蓝图中的幽灵转换为实体的关键方法
             local revived, _ = hovered_entity.revive({ raise_revive = true })
             if not revived then
-                -- If revival fails, return the item to the player
-                player.insert({name = matching_item.name, count = 1, quality = hovered_entity.quality})
-                player.create_local_flying_text({
-                    text = {"autoplacer.messages.build-failed"},
-                    position = hovered_entity.position,
-                    color = {r = 1, g = 0.4, b = 0.4},
-                })
+                -- 如果复活失败，将物品归还给玩家
+                refund_item(player, matching_item.name, hovered_entity.quality, hovered_entity.position)
             end
             return
         end
