@@ -7,10 +7,5 @@
   "contact": "https://github.com/sandorex/AutoPlacer/issues",
   "homepage": "https://github.com/sandorex/AutoPlacer",
   "description": "Automatically place ghost entities from the item in the cursor",
-  "dependencies": ["base >= 2.0"],
-  "control_input": {
-    "name": "autoplacer-toggle",
-    "type": "custom-input",
-    "key_sequence": "CONTROL + G"
-  }
+  "dependencies": ["base >= 2.0"]
 }
