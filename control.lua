@@ -22,25 +22,7 @@ end
 
 -- 计算玩家的最大建造距离
 local function get_build_distance(player)
-    local distance = player.build_distance
-
-    -- 检查新范围技术并计算建造距离
-    if player.force.technologies["autoplacer-range-1"].researched then
-        distance = distance * 2 -- 距离翻倍
-    end
-
-    if player.force.technologies["autoplacer-range-2"].researched then
-        distance = distance * 2 -- 再次翻倍（总计4倍）
-    end
-
-    if player.force.technologies["autoplacer-range-3"].researched then
-        local range_upgrade_level = player.force.technologies["autoplacer-range-3"].level - 2
-        if range_upgrade_level >= 1 then
-            distance = distance * (2 ^ range_upgrade_level)
-        end
-    end
-
-    return distance
+    return player.build_distance
 end
 
 -- 检查玩家与目标位置的距离是否在建造范围内
@@ -119,34 +101,7 @@ commands.add_command("autoplacer-research", { "autoplacer.command.description" }
     player.print({ "autoplacer.command.researched" })
 end)
 
--- 处理控制台命令：研究范围技术
-commands.add_command("autoplacer-range", { "autoplacer.command.range-description" }, function(command)
-    local player = game.get_player(command.player_index)
-    if not player then
-        -- 如果从服务器控制台运行命令，应用于所有势力
-        for i = 1, 3 do
-            research_for_all_forces("autoplacer-range-" .. i)
-        end
-        return
-    end
 
-    -- 检查玩家是否有管理员权限
-    if not player.admin then
-        player.print({ "autoplacer.command.no-permission" })
-        return
-    end
-
-    -- 研究所有范围技术
-    for i = 1, 3 do
-        local tech_name = "autoplacer-range-" .. i
-        if not player.force.technologies[tech_name].researched then
-            player.force.technologies[tech_name].researched = true
-            player.print({ "autoplacer.command.range-researched", tech_name })
-        else
-            player.print({ "autoplacer.command.range-already-researched", tech_name })
-        end
-    end
-end)
 
 -- 显示范围提示信息
 local function show_range_message(player, position, message_key)
