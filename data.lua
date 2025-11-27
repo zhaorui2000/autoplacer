@@ -32,27 +32,6 @@ data:extend({
     }
   },
   
-  -- Define "Auto Decon" technology for marking depleted miners
-  {
-    type = "technology",
-    name = "autodecon",
-    icons = {
-      {
-        icon = "__autoplacer__/graphics/autodel/512x512.png",
-        icon_size = 512
-      }
-    },
-    prerequisites = { "automation-2" },
-    unit = {
-      count = 50,
-      ingredients = {
-        { "automation-science-pack", 1 },
-        { "logistic-science-pack", 1 }
-      },
-      time = 60
-    }
-  },
-  
 
   
   -- Define in-game shortcut (displayed in technology tree interface after technology unlock)
